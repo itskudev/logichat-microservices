@@ -1,0 +1,106 @@
+package com.logichat.auth.controller;
+
+import com.logichat.auth.dto.LoginRequest;
+import com.logichat.auth.dto.LoginResponse;
+import com.logichat.auth.dto.RegistroRequest;
+import com.logichat.auth.dto.UsuarioResponse;
+import com.logichat.auth.model.Usuario;
+import com.logichat.auth.security.JwtService;
+import com.logichat.auth.service.UsuarioService;
+import com.logichat.auth.utils.ApiResponse;
+import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/auth")
+public class AuthController {
+
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
+    private final UsuarioService usuarioService;
+
+    public AuthController(AuthenticationManager authenticationManager,
+                          JwtService jwtService,
+                          UsuarioService usuarioService) {
+        this.authenticationManager = authenticationManager;
+        this.jwtService = jwtService;
+        this.usuarioService = usuarioService;
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<ApiResponse<?>> registrar(@Valid @RequestBody RegistroRequest request) {
+        Usuario usuario = usuarioService.registrar(request);
+        ApiResponse<UsuarioResponse> response =
+                new ApiResponse<>(true, "Usuario registrado", new UsuarioResponse(usuario));
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<?>> login(@Valid @RequestBody LoginRequest request) {
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail().trim(), request.getPassword()));
+        Usuario usuario = (Usuario) authentication.getPrincipal();
+        LoginResponse bean = new LoginResponse(jwtService.generateToken(usuario), new UsuarioResponse(usuario));
+        ApiResponse<LoginResponse> response = new ApiResponse<>(true, "Login correcto", bean);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    // Gestión de usuarios (solo ADMIN en una fase posterior con @PreAuthorize; por ahora autenticado).
+    @GetMapping("/usuarios")
+    public ResponseEntity<ApiResponse<?>> listar() {        List<UsuarioResponse> lista = usuarioService.listar().stream().map(UsuarioResponse::new).toList();
+        ApiResponse<List<UsuarioResponse>> response = new ApiResponse<>(true, "Listado de usuarios", lista);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @GetMapping("/usuarios/{id}")
+    public ResponseEntity<ApiResponse<?>> obtener(@PathVariable Long id) {
+        UsuarioResponse bean = new UsuarioResponse(usuarioService.obtener(id));
+        ApiResponse<UsuarioResponse> response = new ApiResponse<>(true, "Usuario existe", bean);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PostMapping("/usuarios")
+    public ResponseEntity<ApiResponse<?>> crear(@RequestBody Map<String, String> body) {
+        Usuario usuario = usuarioService.crearConRol(
+                body.getOrDefault("nombre", ""), body.getOrDefault("apellido", ""),
+                body.get("email"), body.get("password"), body.getOrDefault("rol", "CLIENTE"));
+        ApiResponse<UsuarioResponse> response =
+                new ApiResponse<>(true, "Usuario registrado", new UsuarioResponse(usuario));
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @PutMapping("/usuarios/{id}/rol")
+    public ResponseEntity<ApiResponse<?>> cambiarRol(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        UsuarioResponse bean = new UsuarioResponse(usuarioService.cambiarRol(id, body.get("rol")));
+        ApiResponse<UsuarioResponse> response = new ApiResponse<>(true, "Rol actualizado", bean);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PutMapping("/usuarios/{id}/bloquear")
+    public ResponseEntity<ApiResponse<?>> bloquear(@PathVariable Long id) {
+        UsuarioResponse bean = new UsuarioResponse(usuarioService.bloquear(id, true));
+        ApiResponse<UsuarioResponse> response = new ApiResponse<>(true, "Usuario bloqueado", bean);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PutMapping("/usuarios/{id}/desbloquear")
+    public ResponseEntity<ApiResponse<?>> desbloquear(@PathVariable Long id) {
+        UsuarioResponse bean = new UsuarioResponse(usuarioService.bloquear(id, false));
+        ApiResponse<UsuarioResponse> response = new ApiResponse<>(true, "Usuario activado", bean);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @DeleteMapping("/usuarios/{id}")
+    public ResponseEntity<ApiResponse<?>> eliminar(@PathVariable Long id) {
+        usuarioService.eliminar(id);
+        ApiResponse<Void> response = new ApiResponse<>(true, "Usuario eliminado", null);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+}

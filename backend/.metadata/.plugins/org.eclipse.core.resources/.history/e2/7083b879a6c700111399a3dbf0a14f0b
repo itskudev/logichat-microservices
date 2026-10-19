@@ -1,0 +1,42 @@
+server:
+ port: 8080	
+spring:
+ application:
+  name: GATEWAY
+ cloud:
+  gateway:
+   server:
+    webflux:
+      routes:
+       - id: ms-personas-auth
+         uri: lb://ms-personas
+         predicates:
+          - Path=/auth/**
+       - id: ms-operaciones
+         uri: lb://ms-operaciones
+         predicates:
+          - Path=/operaciones/**
+       - id: ms-personas
+         uri: lb://ms-personas
+         predicates:
+          - Path=/personas/**
+    globalcors:
+     cors-configurations:
+      '[/**]':
+       allowed-origins: "http://localhost:5173"
+       allowed-methods: "*"
+       allowed-headers: "*"
+gateway:
+  security:
+    enabled: ${GATEWAY_SECURITY_ENABLED:false}
+eureka:
+ instance:
+  hostname: localhost
+ client:
+  fetch-registry: true
+  register-with-eureka: true
+  service-url:
+   defaultZone: http://localhost:8761/eureka
+jwt:
+ secret: ${JWT_SECRET:/urSDUIrV3z7QBnshgjDKBw7+MgBEYIki+/z42yAm/E=}
+ expiration: ${JWT_EXPIRATION:3600000}

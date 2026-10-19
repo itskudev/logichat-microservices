@@ -1,0 +1,87 @@
+package com.logichat.personas.controller;
+
+import com.logichat.personas.client.AuthClient;
+import com.logichat.personas.client.UsuarioRefDTO;
+import com.logichat.personas.dto.ConductorResponse;
+import com.logichat.personas.service.ConductorService;
+import com.logichat.personas.utils.ApiResponse;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/personas/conductores")
+public class ConductorController {
+
+    private final ConductorService conductorService;
+    private final AuthClient authClient;
+
+    public ConductorController(ConductorService conductorService, AuthClient authClient) {
+        this.conductorService = conductorService;
+        this.authClient = authClient;
+    }
+
+    private Map<Long, UsuarioRefDTO> usuarios(List<Long> ids) {
+        Map<Long, UsuarioRefDTO> map = new HashMap<>();
+        ids.stream().distinct().forEach(id -> {
+            try { map.put(id, authClient.getUsuario(id)); } catch (Exception ignored) { }
+        });
+        return map;
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<?>> listar() {
+        var lista = conductorService.listar();
+        var users = usuarios(lista.stream().map(c -> c.getUsuarioId()).toList());
+        List<ConductorResponse> dto = lista.stream().map(c -> new ConductorResponse(c, users.get(c.getUsuarioId()))).toList();
+        ApiResponse<List<ConductorResponse>> response = new ApiResponse<>(true, "Listado de conductores", dto);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @GetMapping("/disponibles")
+    public ResponseEntity<ApiResponse<?>> disponibles() {
+        var lista = conductorService.listarDisponibles();
+        var users = usuarios(lista.stream().map(c -> c.getUsuarioId()).toList());
+        List<ConductorResponse> dto = lista.stream().map(c -> new ConductorResponse(c, users.get(c.getUsuarioId()))).toList();
+        ApiResponse<List<ConductorResponse>> response = new ApiResponse<>(true, "Conductores disponibles", dto);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<?>> obtener(@PathVariable Long id) {
+        var c = conductorService.obtener(id);
+        UsuarioRefDTO u = null;
+        try { u = authClient.getUsuario(c.getUsuarioId()); } catch (Exception ignored) { }
+        ApiResponse<ConductorResponse> response = new ApiResponse<>(true, "Conductor existe", new ConductorResponse(c, u));
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<?>> crear(@RequestBody Map<String, Object> body) {
+        Long usuarioId = Long.valueOf(String.valueOf(body.get("usuarioId")));
+        var c = conductorService.crear(usuarioId, (String) body.get("licencia"), (String) body.get("telefono"));
+        UsuarioRefDTO u = null;
+        try { u = authClient.getUsuario(usuarioId); } catch (Exception ignored) { }
+        ApiResponse<ConductorResponse> response = new ApiResponse<>(true, "Conductor registrado", new ConductorResponse(c, u));
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<?>> actualizar(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        var c = conductorService.actualizar(id, body.get("licencia"), body.get("telefono"), body.get("estado"));
+        UsuarioRefDTO u = null;
+        try { u = authClient.getUsuario(c.getUsuarioId()); } catch (Exception ignored) { }
+        ApiResponse<ConductorResponse> response = new ApiResponse<>(true, "Conductor actualizado", new ConductorResponse(c, u));
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<?>> eliminar(@PathVariable Long id) {
+        conductorService.eliminar(id);
+        ApiResponse<Void> response = new ApiResponse<>(true, "Conductor eliminado", null);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+}

@@ -1,0 +1,29 @@
+server:
+ port: 8090
+
+spring:
+  jpa:
+    database: MYSQL
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: true
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL:jdbc:mysql://localhost:3306/operaciones_db?serverTimezone=UTC}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:mysql}
+  messages:
+    basename: validaciones
+  application:
+    name: ms-operaciones
+
+eureka:
+ instance:
+  hostname: localhost
+ client:
+  service-url:
+   defaultZone: http://localhost:8761/eureka
+jwt:
+ secret: ${JWT_SECRET:/urSDUIrV3z7QBnshgjDKBw7+MgBEYIki+/z42yAm/E=}
+ expiration: ${JWT_EXPIRATION:3600000}

@@ -1,0 +1,96 @@
+package com.logichat.operaciones.controller;
+
+import com.logichat.operaciones.dto.EntregaDTO;
+import com.logichat.operaciones.model.Entrega;
+import com.logichat.operaciones.service.EntregaService;
+import com.logichat.operaciones.utils.ApiResponse;
+import java.util.List;
+import java.util.Map;
+import org.modelmapper.ModelMapper;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/operaciones/entregas")
+public class EntregaController {
+
+	private final EntregaService entregaService;
+	private final ModelMapper mapper;
+
+	public EntregaController(EntregaService entregaService, ModelMapper mapper) {
+		this.entregaService = entregaService;
+		this.mapper = mapper;
+	}
+
+    private EntregaDTO toDTO(Entrega e) {
+        EntregaDTO dto = mapper.map(e, EntregaDTO.class);
+        dto.setPedidoId(e.getPedido() != null ? e.getPedido().getId() : null);
+        dto.setPedidoDescripcion(e.getPedido() != null ? e.getPedido().getDescripcion() : null);
+        dto.setPedidoDireccionEntrega(e.getPedido() != null ? e.getPedido().getDireccionEntrega() : null);
+        dto.setVehiculoId(e.getVehiculo() != null ? e.getVehiculo().getId() : null);
+        dto.setVehiculoPlaca(e.getVehiculo() != null ? e.getVehiculo().getPlaca() : null);
+        return dto;
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN','COORDINADOR','CONDUCTOR','CLIENTE')")
+    @GetMapping
+    public ResponseEntity<ApiResponse<?>> listar() {
+		List<EntregaDTO> lista = entregaService.listar().stream().map(this::toDTO).toList();
+		ApiResponse<List<EntregaDTO>> response = new ApiResponse<>(true, "Listado de entregas", lista);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
+
+    @PreAuthorize("hasAnyRole('ADMIN','COORDINADOR','CONDUCTOR')")
+    @GetMapping("/conductor/{conductorId}")
+	public ResponseEntity<ApiResponse<?>> porConductor(@PathVariable Long conductorId) {
+		List<EntregaDTO> lista = entregaService.listarPorConductor(conductorId).stream().map(this::toDTO).toList();
+		ApiResponse<List<EntregaDTO>> response = new ApiResponse<>(true, "Entregas del conductor", lista);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
+
+    @PreAuthorize("hasAnyRole('ADMIN','COORDINADOR','CONDUCTOR','CLIENTE')")
+    @GetMapping("/{id}")
+	public ResponseEntity<ApiResponse<?>> obtener(@PathVariable Long id) {
+		EntregaDTO bean = toDTO(entregaService.obtener(id));
+		ApiResponse<EntregaDTO> response = new ApiResponse<>(true, "Entrega existe", bean);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
+
+    @PreAuthorize("hasAnyRole('ADMIN','COORDINADOR')")
+    @PostMapping
+	public ResponseEntity<ApiResponse<?>> crear(@RequestBody Map<String, Object> body) {
+		Object raw = body.get("pedidoId") != null ? body.get("pedidoId") : body.get("pedido_id");
+		Long pedidoId = Long.valueOf(String.valueOf(raw));
+		EntregaDTO bean = toDTO(entregaService.crear(pedidoId));
+		ApiResponse<EntregaDTO> response = new ApiResponse<>(true, "Entrega registrada", bean);
+		return new ResponseEntity<>(response, HttpStatus.CREATED);
+	}
+
+    @PreAuthorize("hasAnyRole('ADMIN','COORDINADOR')")
+    @PutMapping("/{id}/asignar")
+	public ResponseEntity<ApiResponse<?>> asignar(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+		Long conductorId = Long.valueOf(String.valueOf(body.get("conductorId")));
+		Long vehiculoId = Long.valueOf(String.valueOf(body.get("vehiculoId")));
+		EntregaDTO bean = toDTO(entregaService.asignar(id, conductorId, vehiculoId));
+		ApiResponse<EntregaDTO> response = new ApiResponse<>(true, "Entrega asignada", bean);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
+
+    @PreAuthorize("hasAnyRole('ADMIN','COORDINADOR','CONDUCTOR')")
+    @PutMapping("/{id}/estado")
+	public ResponseEntity<ApiResponse<?>> estado(@PathVariable Long id, @RequestBody Map<String, String> body) {
+		EntregaDTO bean = toDTO(entregaService.cambiarEstado(id, body.get("estado")));
+		ApiResponse<EntregaDTO> response = new ApiResponse<>(true, "Estado de entrega actualizado", bean);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
+
+    @PreAuthorize("hasAnyRole('ADMIN','COORDINADOR')")
+    @DeleteMapping("/{id}")
+	public ResponseEntity<ApiResponse<?>> eliminar(@PathVariable Long id) {
+		entregaService.eliminar(id);
+		ApiResponse<Void> response = new ApiResponse<>(true, "Entrega eliminada", null);
+		return new ResponseEntity<>(response, HttpStatus.OK);
+	}
+}
